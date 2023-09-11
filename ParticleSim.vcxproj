@@ -142,6 +142,14 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Font Include="res\SpaceMono-Bold.ttf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sfml-graphics-d-2.dll" />
+    <None Include="sfml-system-d-2.dll" />
+    <None Include="sfml-window-d-2.dll" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

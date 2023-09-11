@@ -102,7 +102,7 @@ int main() {
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Hello");
 
 	sf::Font displayFont;
-	if (!displayFont.loadFromFile("SpaceMono-Bold.ttf"))
+	if (!displayFont.loadFromFile("res/SpaceMono-Bold.ttf"))
 		return -42;
 
 	sf::Clock simClock;

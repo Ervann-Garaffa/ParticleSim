@@ -19,4 +19,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Font Include="res\SpaceMono-Bold.ttf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sfml-graphics-d-2.dll" />
+    <None Include="sfml-system-d-2.dll" />
+    <None Include="sfml-window-d-2.dll" />
+  </ItemGroup>
 </Project>
