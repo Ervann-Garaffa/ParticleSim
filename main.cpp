@@ -2,13 +2,13 @@
 #include <random>
 #include <SFML/Graphics.hpp>
 
-const int WINDOW_WIDTH = 1000;
-const int WINDOW_HEIGHT = 1000;
+const int WINDOW_WIDTH = 3000;
+const int WINDOW_HEIGHT = 1200;
 
 const float TAR_FPS = 144.1;
 const float TAR_DT = 1000000 / TAR_FPS;
 const float G = 9.81 / TAR_FPS;
-const float REBOUND_EFFICIENCY = 0.9;
+const float REBOUND_EFFICIENCY = 0.99;
 const int EDGE = 5;
 const int SIZE = EDGE * EDGE;
 const float GRID_SUB_WIDTH = WINDOW_WIDTH / EDGE;
@@ -99,7 +99,7 @@ struct Particle {
 };
 
 int main() {
-	sf::RenderWindow window(sf::VideoMode(1000, 1000), "Hello");
+	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Hello");
 
 	sf::Font displayFont;
 	if (!displayFont.loadFromFile("SpaceMono-Bold.ttf"))
@@ -123,10 +123,12 @@ int main() {
 		while (window.pollEvent(event)) {
 			if (event.type == sf::Event::Closed)
 				window.close();
-			if (event.type == sf::Event::MouseButtonPressed) {
-				temp.emplace_back(rand(1, 20), event.mouseButton.x, event.mouseButton.y, 0, 0, 0, 0);
-			}
+			//if (event.type == sf::Event::MouseButtonPressed)
+			//	temp.emplace_back(rand(1, 20), event.mouseButton.x, event.mouseButton.y, 0, 0, 0, 0);
 		}
+
+		if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+			temp.emplace_back(rand(1, 50), sf::Mouse::getPosition(window).x, sf::Mouse::getPosition(window).y, 0, 0, 0, 0);
 
 		window.clear();
 
