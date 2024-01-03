@@ -3,22 +3,22 @@
 #include <random>
 #include <SFML/Graphics.hpp>
 
-const double PI = std::atan(1.0) * 4;
+const double PI = std::atan(1.0f) * 4;
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 800;
 
-const float TAR_FPS = 60.1;
+const float TAR_FPS = 60.1f;
 const float TAR_DT = 1000000 / TAR_FPS;
 const sf::Time TAR_FRAME_TIME = sf::microseconds(TAR_DT);
 
 const double G = 0.0007;//0.00000000006674 m3 kg-1 s-2;		// Gravitationnal constant G in newtonian law of attraction
 const float RHO = 1;					// Hypothetic density
-const float EG = 9.81 / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
+const float EG = 9.81f / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
 
-const float REBOUND_EFFICIENCY = 0.8;
+const float REBOUND_EFFICIENCY = 0.8f;
 
-const int EDGE = 4;
+const int EDGE = 5;
 const int SIZE = EDGE * EDGE;
 const float GRID_SUB_WIDTH = WINDOW_WIDTH / EDGE;
 const float GRID_SUB_HEIGHT = WINDOW_HEIGHT / EDGE;
@@ -126,7 +126,7 @@ struct Particle {
 		if (otherParticle != *this) {
 			// Apply newtonian law of attraction : F = G.m1.m2/r² & F = m.a => a += G.m2/r²
 			sf::Vector2f linkVector = sf::Vector2f(otherParticle.m_pos.x - this->m_pos.x, otherParticle.m_pos.y - this->m_pos.y);
-			float distance = sqrt(pow(otherParticle.m_pos.x - this->m_pos.x, 2) + pow(otherParticle.m_pos.y - this->m_pos.y, 2));
+			float distance = (float)sqrt(pow(otherParticle.m_pos.x - this->m_pos.x, 2) + pow(otherParticle.m_pos.y - this->m_pos.y, 2));
 			if (distance <= 2.f) { distance = 2.f; }
 			sf::Vector2f normedVector = linkVector / distance;
 
@@ -163,8 +163,6 @@ int main() {
 	fpsCounter.setCharacterSize(15);
 	fpsCounter.setPosition(20, 20);
 
-	// Fixed size array with manual memory management 
-	//std::vector<Particle>** grid = new std::vector<Particle>*[SIZE];
 	// Dynamically sized array with automatic memory management
 	std::vector<std::vector<Particle>> grid;
 	grid.resize(SIZE);
@@ -188,7 +186,6 @@ int main() {
 			// Create randomly placed particles every frame in a grid slot
 			Particle partTemp(RANDOM);
 			grid[partTemp.m_gridY * EDGE + partTemp.m_gridX].emplace_back(partTemp);
-			//temp.emplace_back(RANDOM);
 			// Create particles at mouse position every frame
 			//temp.emplace_back(rand(1, 50), sf::Mouse::getPosition(window).x, sf::Mouse::getPosition(window).y, 0, 0, 0, 0);
 		}
@@ -199,25 +196,32 @@ int main() {
 		for (int x = 0; x < SIZE; x++) {
 			// Through vectors
 			for (int y = 0; y < grid[x].size(); y++) {
-				grid[x][y].resetForces();
+				Particle& p = grid[x][y];
+				p.resetForces();
 				// Through neighboring areas
-				for (int j = grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX - 1; j <= grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX + 1; j++) {
+				for (int j = p.m_gridY * EDGE + p.m_gridX - 1; j <= p.m_gridY * EDGE + p.m_gridX + 1; j++) {
 					for (int k = j - EDGE; k <= j + EDGE; k += EDGE) {
 						// Only if in bounds
 						if (k >= 0 && k < SIZE) {
 							// Through all particles in neighboring areas
 							for (auto& otherP : grid[k]) {
 								// Prevents self interaction
-								if (otherP != grid[x][y]) {
-									grid[x][y].interact(otherP);
+								if (otherP != p) {
+									std::vector<sf::Vertex> lines{
+										sf::Vertex(p.m_pos, sf::Color::White),
+										sf::Vertex(otherP.m_pos, sf::Color::White)
+									}; 
+									window.draw(lines.data(), lines.size(), sf::Lines);
+
+									p.interact(otherP);
 								}
 							}
 						}
 					}
 				}
 				// Check if particle has changed grid slot position and moves the object to its new valid vector
-				if (grid[x][y].changedGridSub()) {
-					grid[grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX].emplace_back(std::move(grid[x][y]));
+				if (p.changedGridSub()) {
+					grid[p.m_gridY * EDGE + p.m_gridX].emplace_back(std::move(p));
 					grid[x].erase(grid[x].begin() + y);
 					y--;
 				}
