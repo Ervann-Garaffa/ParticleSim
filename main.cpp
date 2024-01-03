@@ -5,14 +5,14 @@
 
 const double PI = std::atan(1.0) * 4;
 
-const int WINDOW_WIDTH = 3000;
-const int WINDOW_HEIGHT = 1200;
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 800;
 
-const float TAR_FPS = 144.1;
+const float TAR_FPS = 60.1;
 const float TAR_DT = 1000000 / TAR_FPS;
 const sf::Time TAR_FRAME_TIME = sf::microseconds(TAR_DT);
 
-const double G = 0.0007;//0.00000000006674;		// Constant of gravity G in newtonian law of attraction
+const double G = 0.0007;//0.00000000006674 m3 kg-1 s-2;		// Gravitationnal constant G in newtonian law of attraction
 const float RHO = 1;					// Hypothetic density
 const float EG = 9.81 / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
 
@@ -60,7 +60,7 @@ struct Particle {
 			m_rad = rand(0.1f, 20);
 			m_mass = RHO * 4 * m_rad * m_rad * m_rad * PI / 3;
 			m_pos = sf::Vector2f(rand(0, WINDOW_WIDTH), rand(0, WINDOW_HEIGHT));
-			m_vel = sf::Vector2f(rand(-0.5f, 0.5f), rand(-0.5f, 0.5f));
+			m_vel = sf::Vector2f(0, 0);//sf::Vector2f(rand(-0.5f, 0.5f), rand(-0.5f, 0.5f));
 			m_acc = sf::Vector2f(0, 0);
 			m_gridX = m_pos.x / GRID_SUB_WIDTH;
 			m_gridY = m_pos.y / GRID_SUB_HEIGHT;
@@ -90,8 +90,11 @@ struct Particle {
 		int newGridX = m_pos.x / GRID_SUB_WIDTH;
 		int newGridY = m_pos.y / GRID_SUB_HEIGHT;
 
-		if (newGridX != m_gridX || newGridY != m_gridY)
+		if (newGridX != m_gridX || newGridY != m_gridY) {
+			m_gridX = m_pos.x / GRID_SUB_WIDTH;
+			m_gridY = m_pos.y / GRID_SUB_HEIGHT;
 			return true; // Grid subdivision has changed
+		}
 
 		return false; // Grid subdivision has not changed
 	}
@@ -160,8 +163,13 @@ int main() {
 	fpsCounter.setCharacterSize(15);
 	fpsCounter.setPosition(20, 20);
 
-	std::vector<Particle>** grid = new std::vector<Particle>*[SIZE];
-	std::vector<Particle> temp;
+	// Fixed size array with manual memory management 
+	//std::vector<Particle>** grid = new std::vector<Particle>*[SIZE];
+	// Dynamically sized array with automatic memory management
+	std::vector<std::vector<Particle>> grid;
+	grid.resize(SIZE);
+
+	std::vector<Particle> temp; // used as a buffer to store Particles to be moved in new arrays
 
 	simClock.restart();
 	
@@ -176,24 +184,51 @@ int main() {
 			//	temp.emplace_back(rand(1, 20), event.mouseButton.x, event.mouseButton.y, 0, 0, 0, 0);
 		}
 
-		if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
-			// Create randomly placed particles every frame
-			temp.emplace_back(RANDOM);
+		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+			// Create randomly placed particles every frame in a grid slot
+			Particle partTemp(RANDOM);
+			grid[partTemp.m_gridY * EDGE + partTemp.m_gridX].emplace_back(partTemp);
+			//temp.emplace_back(RANDOM);
 			// Create particles at mouse position every frame
 			//temp.emplace_back(rand(1, 50), sf::Mouse::getPosition(window).x, sf::Mouse::getPosition(window).y, 0, 0, 0, 0);
+		}
 
 		window.clear();
 
-		for (auto& p : temp) {
-			p.resetForces();
-			for (auto& otherP : temp) {
-				p.interact(otherP);
+		// Through grid
+		for (int x = 0; x < SIZE; x++) {
+			// Through vectors
+			for (int y = 0; y < grid[x].size(); y++) {
+				grid[x][y].resetForces();
+				// Through neighboring areas
+				for (int j = grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX - 1; j <= grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX + 1; j++) {
+					for (int k = j - EDGE; k <= j + EDGE; k += EDGE) {
+						// Only if in bounds
+						if (k >= 0 && k < SIZE) {
+							// Through all particles in neighboring areas
+							for (auto& otherP : grid[k]) {
+								// Prevents self interaction
+								if (otherP != grid[x][y]) {
+									grid[x][y].interact(otherP);
+								}
+							}
+						}
+					}
+				}
+				// Check if particle has changed grid slot position and moves the object to its new valid vector
+				if (grid[x][y].changedGridSub()) {
+					grid[grid[x][y].m_gridY * EDGE + grid[x][y].m_gridX].emplace_back(std::move(grid[x][y]));
+					grid[x].erase(grid[x].begin() + y);
+					y--;
+				}
 			}
 		}
-
-		for (auto& p : temp) {
-			p.update();
-			p.render(window);
+		
+		for (int i = 0; i < SIZE; i++) {
+			for (auto& p : grid[i]) {
+				p.update();
+				p.render(window);
+			}
 		}
 
 		while (simClock.getElapsedTime().asMicroseconds() < TAR_DT) {}
