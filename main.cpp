@@ -8,26 +8,26 @@ const double PI = std::atan(1.0f) * 4;
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 800;
 
-const float TAR_FPS = 60.1f;
-const float TAR_DT = 1000000 / TAR_FPS;
+const double TAR_FPS = 60.1f;
+const double TAR_DT = 1000000 / TAR_FPS;
 const sf::Time TAR_FRAME_TIME = sf::microseconds(TAR_DT);
 
 const double G = 0.0007;//0.00000000006674 m3 kg-1 s-2;		// Gravitationnal constant G in newtonian law of attraction
-const float RHO = 1;					// Hypothetic density
-const float EG = 9.81f / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
+const double RHO = 1;					// Hypothetic density
+const double EG = 9.81f / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
 
-const float REBOUND_EFFICIENCY = 0.8f;
+const double REBOUND_EFFICIENCY = 0.3f;
 
-const int EDGE = 5;
+const int EDGE = 4;
 const int SIZE = EDGE * EDGE;
-const float GRID_SUB_WIDTH = WINDOW_WIDTH / EDGE;
-const float GRID_SUB_HEIGHT = WINDOW_HEIGHT / EDGE;
+const double GRID_SUB_WIDTH = WINDOW_WIDTH / EDGE;
+const double GRID_SUB_HEIGHT = WINDOW_HEIGHT / EDGE;
 
 // Random generator + function
 std::random_device rd;
 std::mt19937 generator(rd());
-float rand(float low, float high) {
-	std::uniform_real_distribution<float> dist(low, high);
+double rand(double low, double high) {
+	std::uniform_real_distribution<double> dist(low, high);
 	return dist(generator);
 }
 
@@ -37,13 +37,13 @@ enum Type {
 
 // Particle definition
 struct Particle {
-	float m_rad;
-	float m_mass;
+	double m_rad;
+	double m_mass;
 	sf::Vector2f m_pos, m_vel, m_acc;
 	sf::CircleShape m_body;
 	int m_gridX, m_gridY; // Grid Subdivision memory stored
 
-	Particle(float rad, float posX, float posY, float velX, float velY, float accX, float accY)
+	Particle(double rad, double posX, double posY, double velX, double velY, double accX, double accY)
 	: m_rad(rad), m_mass(RHO*4*rad*rad*rad*PI/3), m_pos(posX, posY), m_vel(velX, velY), m_acc(accX, accY), 
 	  m_gridX(posX/GRID_SUB_WIDTH), m_gridY(posY/GRID_SUB_HEIGHT)
 	{
@@ -122,18 +122,25 @@ struct Particle {
 		}
 	}
 
-	void interact(Particle& otherParticle) {
+	int interact(Particle& otherParticle) {
 		if (otherParticle != *this) {
 			// Apply newtonian law of attraction : F = G.m1.m2/r² & F = m.a => a += G.m2/r²
 			sf::Vector2f linkVector = sf::Vector2f(otherParticle.m_pos.x - this->m_pos.x, otherParticle.m_pos.y - this->m_pos.y);
-			float distance = (float)sqrt(pow(otherParticle.m_pos.x - this->m_pos.x, 2) + pow(otherParticle.m_pos.y - this->m_pos.y, 2));
+			double distance = sqrt(pow(otherParticle.m_pos.x - this->m_pos.x, 2) + pow(otherParticle.m_pos.y - this->m_pos.y, 2));
 			if (distance <= 2.f) { distance = 2.f; }
-			sf::Vector2f normedVector = linkVector / distance;
+			sf::Vector2f normedVector = linkVector / (float)distance;
 
 			this->m_acc += normedVector * (float)(G * otherParticle.m_mass / pow(distance, 2));
 
+			double interactionStrength = 255 * (WINDOW_WIDTH / EDGE - distance) / (WINDOW_WIDTH / EDGE);
+			if (interactionStrength < 0) { interactionStrength = 0; }
+			else if (interactionStrength > 255) { interactionStrength = 255; }
+			return (int)interactionStrength;
+
 			// TODO inter-particle collisions
 		}
+
+		return 0;
 	}
 
 	void update() {
@@ -169,6 +176,11 @@ int main() {
 
 	std::vector<Particle> temp; // used as a buffer to store Particles to be moved in new arrays
 
+	// Initialize a position sum and a particle sum that will add up at each interaction
+	// so we can substract the average position relative to the center so all particles stay centered
+	double relPositionSum = 0.f;
+	double numberOfParticles = 0.f;
+
 	simClock.restart();
 	
 	while (window.isOpen()) {
@@ -195,35 +207,66 @@ int main() {
 		// Through grid
 		for (int x = 0; x < SIZE; x++) {
 			// Through vectors
-			for (int y = 0; y < grid[x].size(); y++) {
-				Particle& p = grid[x][y];
-				p.resetForces();
-				// Through neighboring areas
-				for (int j = p.m_gridY * EDGE + p.m_gridX - 1; j <= p.m_gridY * EDGE + p.m_gridX + 1; j++) {
-					for (int k = j - EDGE; k <= j + EDGE; k += EDGE) {
-						// Only if in bounds
-						if (k >= 0 && k < SIZE) {
-							// Through all particles in neighboring areas
-							for (auto& otherP : grid[k]) {
-								// Prevents self interaction
-								if (otherP != p) {
-									std::vector<sf::Vertex> lines{
-										sf::Vertex(p.m_pos, sf::Color::White),
-										sf::Vertex(otherP.m_pos, sf::Color::White)
-									}; 
-									window.draw(lines.data(), lines.size(), sf::Lines);
-
-									p.interact(otherP);
+			// Through vectors (iterate in reverse to handle erasing)
+			for (int y = static_cast<int>(grid[x].size()) - 1; y >= 0; --y) {
+				// Additional check to ensure the index is within bounds
+				if (y >= 0 && y < grid[x].size()) {
+					Particle& p = grid[x][y];
+					p.resetForces();
+					// Through neighboring areas
+					for (int j = p.m_gridY * EDGE + p.m_gridX - 1; j <= p.m_gridY * EDGE + p.m_gridX + 1; j++) {
+						for (int k = j - EDGE; k <= j + EDGE; k += EDGE) {
+							// Only if in bounds
+							if (k >= 0 && k < SIZE) {
+								// Through all particles in neighboring areas
+								for (auto& otherP : grid[k]) {
+									if (otherP != p) {
+										// Interact and draw each interaction line
+										uint8_t interactionLineOpacity = p.interact(otherP);
+										std::vector<sf::Vertex> interactionLines{
+												sf::Vertex(p.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity)),
+												sf::Vertex(otherP.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity))
+										};
+										window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);
+																		
+									}
 								}
 							}
 						}
 					}
-				}
-				// Check if particle has changed grid slot position and moves the object to its new valid vector
-				if (p.changedGridSub()) {
-					grid[p.m_gridY * EDGE + p.m_gridX].emplace_back(std::move(p));
-					grid[x].erase(grid[x].begin() + y);
-					y--;
+					// draw velocity vector
+					std::vector<sf::Vertex> velLines{
+							sf::Vertex(p.m_pos, sf::Color::Color(0, 0, 255, 255)),
+							sf::Vertex(p.m_pos + 100.f * p.m_vel, sf::Color::Color(0, 0, 255, 255))
+					};
+					window.draw(velLines.data(), velLines.size(), sf::Lines);
+
+					// draw acceleration vector
+					std::vector<sf::Vertex> accelLines{
+							sf::Vertex(p.m_pos, sf::Color::Color(255, 0, 0, 255)),
+							sf::Vertex(p.m_pos + 10000.f * p.m_acc, sf::Color::Color(255, 0, 0, 255))
+					};
+					window.draw(accelLines.data(), accelLines.size(), sf::Lines);
+
+					// Check if particle has changed grid slot position and moves the object to its new valid vector
+					if (p.changedGridSub()) {
+						// The particle has changed grid slot, move it to the new vector
+						int newGridIndex = p.m_gridY * EDGE + p.m_gridX;
+
+						// Ensure the newGridIndex is within bounds
+						if (newGridIndex >= 0 && newGridIndex < SIZE) {
+							grid[newGridIndex].emplace_back(std::move(p));
+							grid[x].erase(grid[x].begin() + y);
+							y--;
+						}
+						else {
+							// Print a message or handle the out-of-bounds case
+							std::cout << "Warning: Index out of bounds for grid[" << newGridIndex << "]   P coordinates : [" << p.m_pos.x << "][" << p.m_pos.y << "]" << std::endl;
+						}
+					}
+				} else {
+					// Print a message or handle the out-of-bounds case
+					std::cout << "Warning: Index out of bounds for grid[" << x << "][" << y << "]" << std::endl;
 				}
 			}
 		}
