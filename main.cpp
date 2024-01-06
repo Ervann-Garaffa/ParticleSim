@@ -18,7 +18,7 @@ const double EG = 9.81f / TAR_FPS;		// Calculated Earth equivalent G valid at ta
 
 const double REBOUND_EFFICIENCY = 0.3f;
 
-const int EDGE = 4;
+const int EDGE = 5;
 const int SIZE = EDGE * EDGE;
 const double GRID_SUB_WIDTH = WINDOW_WIDTH / EDGE;
 const double GRID_SUB_HEIGHT = WINDOW_HEIGHT / EDGE;
@@ -125,12 +125,14 @@ struct Particle {
 	int interact(Particle& otherParticle) {
 		if (otherParticle != *this) {
 			// Apply newtonian law of attraction : F = G.m1.m2/r² & F = m.a => a += G.m2/r²
-			sf::Vector2f linkVector = sf::Vector2f(otherParticle.m_pos.x - this->m_pos.x, otherParticle.m_pos.y - this->m_pos.y);
-			double distance = sqrt(pow(otherParticle.m_pos.x - this->m_pos.x, 2) + pow(otherParticle.m_pos.y - this->m_pos.y, 2));
+			double	px = m_pos.x, py = m_pos.y,
+					opx = otherParticle.m_pos.x, opy = otherParticle.m_pos.y;
+			sf::Vector2f linkVector = sf::Vector2f(opx - px, opy - py);
+			double distance = sqrt((opx - px) * (opx - px) + (opy - py) * (opy - py));
 			if (distance <= 2.f) { distance = 2.f; }
 			sf::Vector2f normedVector = linkVector / (float)distance;
 
-			this->m_acc += normedVector * (float)(G * otherParticle.m_mass / pow(distance, 2));
+			m_acc += normedVector * (float)(G * otherParticle.m_mass / (distance * distance));
 
 			double interactionStrength = 255 * (WINDOW_WIDTH / EDGE - distance) / (WINDOW_WIDTH / EDGE);
 			if (interactionStrength < 0) { interactionStrength = 0; }
@@ -165,10 +167,17 @@ int main() {
 	sf::Clock simClock;
 	
 	sf::Text fpsCounter;
-	fpsCounter.setFillColor(sf::Color::White);
+	fpsCounter.setFillColor(sf::Color::Blue);
 	fpsCounter.setFont(displayFont);
 	fpsCounter.setCharacterSize(15);
 	fpsCounter.setPosition(20, 20);
+
+	sf::Text partCounter;
+	partCounter.setFillColor(sf::Color::Blue);
+	partCounter.setFont(displayFont);
+	partCounter.setCharacterSize(15);
+	partCounter.setPosition(20, 40);
+	uint32_t partCount = 0;
 
 	// Dynamically sized array with automatic memory management
 	std::vector<std::vector<Particle>> grid;
@@ -198,7 +207,8 @@ int main() {
 
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
 			// Create randomly placed particles every frame in a grid slot
-			Particle partTemp(RANDOM);
+			//Particle partTemp(RANDOM);
+			Particle partTemp(10, rand(0, WINDOW_WIDTH), rand(0, WINDOW_HEIGHT), 0, 0, 0, 0);
 			grid[partTemp.m_gridY * EDGE + partTemp.m_gridX].emplace_back(partTemp);
 			// Create particles at mouse position every frame
 			//temp.emplace_back(rand(1, 50), sf::Mouse::getPosition(window).x, sf::Mouse::getPosition(window).y, 0, 0, 0, 0);
@@ -222,9 +232,9 @@ int main() {
 
 		// Through grid
 		for (int x = 0; x < SIZE; x++) {
-			// Through vectors
 			// Through vectors (iterate in reverse to handle erasing)
-			for (int y = static_cast<int>(grid[x].size()) - 1; y >= 0; --y) {
+			for (int y = grid[x].size() - 1; y >= 0; --y) {
+				partCount++;
 				// Additional check to ensure the index is within bounds
 				if (y >= 0 && y < grid[x].size()) {
 					Particle& p = grid[x][y];
@@ -240,35 +250,33 @@ int main() {
 							if ((x < EDGE && k == j - EDGE) ||
 								(x >= EDGE * (EDGE - 1)) && k == j + EDGE)
 								continue;
-							if (k >= 0 && k < SIZE) {
-								// Through all particles in neighboring areas
-								for (auto& otherP : grid[k]) {
-									if (otherP != p) {
-										// Interact and draw each interaction line
-										uint8_t interactionLineOpacity = p.interact(otherP);
-										std::vector<sf::Vertex> interactionLines{
-												sf::Vertex(p.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity)),
-												sf::Vertex(otherP.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity))
-										};
-										window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);
-									}
+							// Through all particles in neighboring areas
+							for (auto& otherP : grid[k]) {
+								if (otherP != p) {
+									// Interact and draw each interaction line
+									uint8_t interactionLineOpacity = p.interact(otherP);
+									std::vector<sf::Vertex> interactionLines{
+											sf::Vertex(p.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity)),
+											sf::Vertex(otherP.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity))
+									};
+									window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);
 								}
 							}
 						}
 					}
-					// draw velocity vector
-					std::vector<sf::Vertex> velLines{
-							sf::Vertex(p.m_pos, sf::Color::Color(0, 0, 255, 255)),
-							sf::Vertex(p.m_pos + 100.f * p.m_vel, sf::Color::Color(0, 0, 255, 255))
-					};
-					window.draw(velLines.data(), velLines.size(), sf::Lines);
+					//// draw velocity vector
+					//std::vector<sf::Vertex> velLines{
+					//		sf::Vertex(p.m_pos, sf::Color::Color(0, 0, 255, 255)),
+					//		sf::Vertex(p.m_pos + 100.f * p.m_vel, sf::Color::Color(0, 0, 255, 255))
+					//};
+					//window.draw(velLines.data(), velLines.size(), sf::Lines);
 
-					// draw acceleration vector
-					std::vector<sf::Vertex> accelLines{
-							sf::Vertex(p.m_pos, sf::Color::Color(255, 0, 0, 255)),
-							sf::Vertex(p.m_pos + 10000.f * p.m_acc, sf::Color::Color(255, 0, 0, 255))
-					};
-					window.draw(accelLines.data(), accelLines.size(), sf::Lines);
+					//// draw acceleration vector
+					//std::vector<sf::Vertex> accelLines{
+					//		sf::Vertex(p.m_pos, sf::Color::Color(255, 0, 0, 255)),
+					//		sf::Vertex(p.m_pos + 10000.f * p.m_acc, sf::Color::Color(255, 0, 0, 255))
+					//};
+					//window.draw(accelLines.data(), accelLines.size(), sf::Lines);
 
 					// Check if particle has changed grid slot position and moves the object to its new valid vector
 					if (p.changedGridSub()) {
@@ -303,6 +311,9 @@ int main() {
 		while (simClock.getElapsedTime().asMicroseconds() < TAR_DT) {}
 		fpsCounter.setString(std::to_string(1000000 / simClock.restart().asMicroseconds()).append(" FPS"));
 		window.draw(fpsCounter);
+		partCounter.setString(std::to_string(partCount));
+		partCount = 0;
+		window.draw(partCounter);
 
 		window.display();
 	}
