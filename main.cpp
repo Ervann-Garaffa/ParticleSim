@@ -8,11 +8,11 @@ const double PI = std::atan(1.0f) * 4;
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 800;
 
-const double TAR_FPS = 60.1f;
+const double TAR_FPS = 144.1f;
 const double TAR_DT = 1000000 / TAR_FPS;
 const sf::Time TAR_FRAME_TIME = sf::microseconds(TAR_DT);
 
-const double G = 0.0007;//0.00000000006674 m3 kg-1 s-2;		// Gravitationnal constant G in newtonian law of attraction
+const double G = 0.00005;//0.00000000006674 m3 kg-1 s-2;		// Gravitationnal constant G in newtonian law of attraction
 const double RHO = 1;					// Hypothetic density
 const double EG = 9.81f / TAR_FPS;		// Calculated Earth equivalent G valid at target fps
 
@@ -190,8 +190,10 @@ int main() {
 			if (event.type == sf::Event::Closed)
 				window.close();
 			// Create particles at mouse position at mouse button press
-			//if (event.type == sf::Event::MouseButtonPressed)
-			//	temp.emplace_back(rand(1, 20), event.mouseButton.x, event.mouseButton.y, 0, 0, 0, 0);
+			/*if (event.type == sf::Event::MouseButtonPressed) {
+				Particle partTemp(2, sf::Mouse::getPosition(window).x, sf::Mouse::getPosition(window).y, 0, 0, 0, 0);
+				grid[partTemp.m_gridY * EDGE + partTemp.m_gridX].emplace_back(partTemp);
+			}*/
 		}
 
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
@@ -204,6 +206,20 @@ int main() {
 
 		window.clear();
 
+		// TODO : draw grid slot frontiers
+		for (int i = 1; i < EDGE; i++) {
+			std::vector<sf::Vertex> horizLine{
+				sf::Vertex(sf::Vector2f(0, i * WINDOW_HEIGHT / EDGE), sf::Color::Color(0, 255, 0, 100)),
+				sf::Vertex(sf::Vector2f(WINDOW_WIDTH, i * WINDOW_HEIGHT / EDGE), sf::Color::Color(0, 255, 0, 100))
+			};
+			std::vector<sf::Vertex> vertiLine{
+				sf::Vertex(sf::Vector2f(i * WINDOW_WIDTH / EDGE, 0), sf::Color::Color(0, 255, 0, 100)),
+				sf::Vertex(sf::Vector2f(i * WINDOW_WIDTH / EDGE, WINDOW_HEIGHT), sf::Color::Color(0, 255, 0, 100))
+			};
+			window.draw(horizLine.data(), horizLine.size(), sf::Lines);
+			window.draw(vertiLine.data(), vertiLine.size(), sf::Lines);
+		}
+
 		// Through grid
 		for (int x = 0; x < SIZE; x++) {
 			// Through vectors
@@ -214,9 +230,16 @@ int main() {
 					Particle& p = grid[x][y];
 					p.resetForces();
 					// Through neighboring areas
-					for (int j = p.m_gridY * EDGE + p.m_gridX - 1; j <= p.m_gridY * EDGE + p.m_gridX + 1; j++) {
+					for (int j = x - 1; j <= x + 1; j++) {
+						// Only if in bounds | makes sure it doesn't interact across the screen to avoid unnecessary calculations
+						if ((x % EDGE == EDGE - 1 && j == x + 1) || 
+							(x % EDGE == 0 && j == x - 1))
+							continue;							
 						for (int k = j - EDGE; k <= j + EDGE; k += EDGE) {
-							// Only if in bounds
+							// Only if in bounds | makes sure it doesn't interact across the screen to avoid unnecessary calculations
+							if ((x < EDGE && k == j - EDGE) ||
+								(x >= EDGE * (EDGE - 1)) && k == j + EDGE)
+								continue;
 							if (k >= 0 && k < SIZE) {
 								// Through all particles in neighboring areas
 								for (auto& otherP : grid[k]) {
@@ -228,7 +251,6 @@ int main() {
 												sf::Vertex(otherP.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity))
 										};
 										window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);
-																		
 									}
 								}
 							}
