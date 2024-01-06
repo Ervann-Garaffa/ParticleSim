@@ -255,11 +255,11 @@ int main() {
 								if (otherP != p) {
 									// Interact and draw each interaction line
 									uint8_t interactionLineOpacity = p.interact(otherP);
-									std::vector<sf::Vertex> interactionLines{
+									/*std::vector<sf::Vertex> interactionLines{
 											sf::Vertex(p.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity)),
 											sf::Vertex(otherP.m_pos, sf::Color::Color(255, 255, 255, interactionLineOpacity))
 									};
-									window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);
+									window.draw(interactionLines.data(), interactionLines.size(), sf::Lines);*/
 								}
 							}
 						}
